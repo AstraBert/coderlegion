@@ -1,0 +1,94 @@
+<h1>Create a python Telegram bot, plain and simple</h1>
+<h2>Learn about sending and receiving messages, photos and documents, dive deep in the world of automation!</h2>
+
+<div class="div-green">
+    <span class="alert-body">This post is</span>
+    <span class="alert-header"> beginners' friendly :)</span>
+</div>
+
+<h3>1. Introduction</h3>
+<p>Most of the people nowadays make use of instant messanging tools, such as WhatsApp, Telegram, Discord or Snapchat, and if you are a user of one of these applications, you are probably already familiar with the concept of&nbsp;<em>bot</em>. If you aren't, let's have a quick look to what it is and how we can use it for our purposes.</p>
+<p>The word "bot" is an abbreviation of "robot", and it has been introduced in informatic systems to identify non-human, completely automatic, users that has been employed for all sorts of purposes: correcting grammar mistakes (such as on Wikipedia), liking someone's post (on social media), scraping web content...</p>
+<p>In recent years, people started to develop tools that could be used to generate automatic responses in messanging services. This was a solution firstly conceived for customer support, and now that bots entered the realm of chatting apps they are implied for lots of different tasks: moderation, standardized replies, messange analysis, authorization...&nbsp;</p>
+<p>Now that you know what a bot is, if you already didn't, it is time to learn how we can build our own bot, and we'll start with one of the most beloved applications to deploy it: Telegram.&nbsp;</p>
+<h3>2. Setup</h3>
+<p>We will take for granted the fact that you already have a Telegram account: in case you don't have, creating one is really simple and you just need to head over to the <a href="https://web.telegram.org/">website</a> (if you are on a laptop) or download their application (if you are on you cell phone).</p>
+<p>Now, open Telegram and type into the search bar "Botfather": this will guide you to the father of all bots, which will create the bot user we are interested in.</p>
+<p>Send to BotFather the /newbot command, and it will prompt you to give your bot a username and then a name that ends with "bot".&nbsp; For today's tutorial, we will create a simple Neapolitan Pizzeria assistant, so we will simply go for "NeapolitanPizzaBot" as both the username and the bot name.</p>
+<p>Once you are done with the naming, BotFather will send you the real thing that interests us: the API Token, through which we will interact with Telegram, sending messages and retrieving responses. Copy the Token and then open a python file called "bot.py" in your favorite code editor.</p>
+<p><code>TOKEN = 6789238423:sdhfshgbpsigbspgiJsnsoaH #this is only an example token</code></p>
+<h3>3. Environment preparation</h3>
+<p>In order to make the "bot.py" script work with Telegram, you will need a lot more than simply your token. First of all, you will need to install <a href="https://python-telegram-bot.org/">python-telegram-bot</a> package, and you can simply do it through python package manager, pip:</p>
+<p><code>&nbsp;python3 -m pip install python-telegram-bot</code></p>
+<p>Now that the installation is done, we will be able to do evertyhing we need, so let's dive in and build our Neapolitan Pizzeria Assistant.&nbsp;</p>
+<h3>4. Build the bot</h3>
+<p>We will start by importing the necessary pacakges:</p>
+<p><code>from telegram.ext import *</code></p>
+<p>Now, we will start simply with defining the message that our bot will send to every user when it is started:</p>
+
+async def start_command(update, context):
+    await update.message.reply_text("Hi, I'm NeapolitanPizzaBot, how may I assist you today?")
+
+<p>Note that this and most of the following functions are asynchronous, which means that they do not execute right when they are called, but they wait for the application to respond to their queries before execution.</p>
+<p>We want our bot to be able to tell customers the price of our three most famous pizzas, which are Margherita, Marinara and Pepperoni, to send them the location of the restaurant and a photo of our complete menu.</p>
+<p>In this sense, we will use commands, that, for Telegram bots, are strings of text that start with "/": we will use /price, /location and /menu.</p>
+<p>For the /price command, we simply need to reply a text message, and this can be achieved with the "reply_text" method, as we did for our starting function.</p>
+
+async def price_command(update, context):
+    await update.message.reply_text("- Margherita: 8$\n- Marinara: 5$\n- Pepperoni: 9$")
+
+    <p>For the /location command, we need to pass an actual location, and to do so we just use the "reply_venue" method and copy-paste the coordinates from Google Maps, pass the name of the place and the name of the street/place we are sending.</p>
+    async def location_command(update, context):
+        await update.message.reply_venue(40.82694507320722, 14.426713826679295, "Italy", "Pizzeria NeapolitanPizzaBot")
+<p>&nbsp;In order to send an image, we must have it saved somewhere on our local machine, in order for the bot to take it and forward it to the user. We will just take a photo of our menu, save it within the same folder of bot.py as "menu.png". Now we use the method "reply_photo" to send it:</p>
+
+async def menu_command(update, context):
+    await update.message.reply_photo("menu.jpg")
+
+<p>Now, we just need to define a function that handles errors and also a function that tells the user if they are using commands or messages that are not recognized:</p>
+
+async def unrecognized_command(update, context):
+    text = update.message.text
+    if (
+        text.startswith("/start") == False
+        or text.startswith("/menu") == False
+        or text.startswith("/price") == False
+        or text.startswith("/location") == False
+    ):
+        await update.message.reply_text(
+            f'I cannot understand the message:\n"{text}"\nAs my programmer did not insert it among the command I am set to respond (that are /price, /menu and /location): please check for misspelling/errors or contact the programmer if you feel anything is wrong/missing'
+        )
+    else:
+        pass
+
+
+async def error_handler(update, context: CallbackContext) -> None:
+    await update.message.reply_text("Sorry, something went wrong.")
+ 
+<p>Now that we are done with defining functions, we can actually write the portion of the code that will make the bot work:</p>
+if __name__ == "__main__":
+    print("Bot is high and running")
+    application = Application.builder().token(TOKEN).build()
+    # Commands
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("menu", menu_command))
+    application.add_handler(CommandHandler("price", price_command))
+    application.add_handler(CommandHandler("location", location_command))
+    application.add_handler(MessageHandler(filters.COMMAND, unrecognized_command))
+    application.add_handler(MessageHandler(filters.TEXT, unrecognized_command))
+    application.add_error_handler(error_handler)
+    # Run bot
+    application.run_polling(1.0)
+<p>As you can see, we associated to each command its function, and then we filtered out all the commands and the texts without commands that are not recognized. If something goes wrong, the code is set to recognize it and handle the error. Last but not least, we launch our application with the "run_polling" method.&nbsp;</p>
+<h3>5. Run the bot</h3>
+<p>To run the bot, you can simply launch it from your terminal typing:</p>
+<p><code>python3 bot.py</code></p>
+<p>Alternatively, if you want your bot to run independently from your machine, you can explore services such as <a href="https://www.pythonanywhere.com/">pythonanywhere</a></p>
+<p>Here is, in the meanwhile, an example chat for our bot</p>
+![example_chat][1]
+<h3>6. Conclusion</h3>
+<p>To sum things up, you have build your first python Telegram bot, that is production-ready and will be really useful for our Neapolitan Pizzeria. In this sense, we also explored how basic python skills can be directly applied to real projects and works.&nbsp;</p>
+<p>In my next posts, I will explain how to finegrain our Telegram bots and, when we become sufficiently skilled at building them, we will switch to Discord bots. Our ultimate goal will be to create an AI-powered bot, and this will be the last episode of our bot-related post series... Stay tuned!</p>
+
+
+  [1]: https://coderlegion.com/?qa=blob&qa_blobid=11949383436860980979
