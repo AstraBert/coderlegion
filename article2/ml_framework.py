@@ -3,7 +3,7 @@ import pandas as pd
 df = pd.read_csv("italian_cities.csv")
 
 X = df.drop(columns=["Destination"])
-y = list(df["Destination"])
+y = df["Destination"]
 
 
 from sklearn.model_selection import train_test_split
@@ -21,3 +21,7 @@ from sklearn.metrics import accuracy_score, classification_report
 y_pred = model.predict(X_test)
 print(f"Accuracy is {accuracy_score(y_test, y_pred)}")
 print(f"Classification report:\n{classification_report(y_test,y_pred)}")
+
+import joblib
+
+joblib.dump(model, "model.joblib")

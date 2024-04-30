@@ -1,2 +1,4 @@
 article2/build_dataset.py
 article1/*.png
+article2/mapping_cats.py
+article2/telegram_bot.png

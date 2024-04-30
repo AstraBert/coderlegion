@@ -1,0 +1,242 @@
+<h2>1. Introduction</h2>
+<p>In my <a href="https://coderlegion.com/252/create-a-python-telegram-bot-plain-simple-and-production-ready">last post</a>, we saw how to build a production-ready Telegram bot, although it was really simple: it could only handle three commands and gave standardized responses!</p>
+In this post, we want to explore more in depth the possibility to:
+<li>Build a <b>conversational bot</b></li>
+<li>Give <b>task and user-specific</b> responses</li>
+<p>We will do this exploiting several resources, first of all a <b>machine learning</b> framework and secondly the <b>conversational</b> architecture made available by the `python-telegram-bot` package</p> 
+<h2>2. Setup</h2>
+<h3>2a. Folder setup</h3>
+<p>Before we start building everything, it is good to have a well-structured folder to start with. You can find all the data and the code we need for this tutorial in my CoderLegion-themed <a href="https://github.com/AstraBert/coderlegion">GitHub repository</a> (make sure to give it a <b>star</a>!), under the <a href="https://github.com/AstraBert/coderlegion/tree/main/article2">article2</a> directory, and we will follow that directory's structure as a blueprint:</p>
+
+ - **bot.py** will be the code to make the bot work
+ - **italian_cities.csv** will be the data on which we train out machine-learning model
+ - **ml_framework.py** will be our machine learning model training and testing script
+ - **model.joblib** will be the storage for the trained ML model
+ - **pdfs files** will be the informative material for our use-case
+ - **users.csv** will be the user registry for our use-case
+
+For this use case, we will imagine to be a travel agency organizing trips to three cities in Italy (Rome, Florence and Courmayeur).
+<h3>2b. Take a look at the data</h3>
+*italian_cities.csv* is a comma-separated values file (csv) that gathers data from 300 trips made by people to the three Italian cities of interest to us. These data encompass:
+
+ - Traveler's age
+ - Travel target (alone, couple, group, family)
+ - Transportation method and cost
+ - Accommodation type and cost
+ - Duration of the stay
+
+These records are **NOT** real (and they do not even resemble reality), I made them up just for this tutorial and they should be used only for learning purposes.
+<h3>2c. Install necessary dependencies</h3>
+We already installed `python-telegram-bot`, now we need to install the other dependencies for this tutorial:
+
+    python3 -m pip install pandas scikit-learn joblib
+
+**pandas** will help us visualizing and loading the data, **scikit-learn** will be used to analyze them and **joblib** to save and reload the ML model without having to retrain it every time we start the bot.
+<h2>3. ML framework</h2>
+In this section, we'll be writing our code in *ml_framework.py*. 
+<h3>3a. Load and preprocess the data</h3>
+We load the data from the csv with pandas:
+
+    import pandas as pd
+    
+    df = pd.read_csv("italian_cities.csv")
+
+And then we divide them between training features (X) and target features (y): I won't go through the specifics of machine learning, as I'm planning to explain these concepts in the next article series I will start after having finished the bot one.
+
+    X = df.drop(columns=["Destination"]) # features
+    y = df["Destination"] # target
+
+We divide these data in a training and a testing batch:
+
+    from sklearn.model_selection import train_test_split #sklear = scikit-learn
+    
+    X_train, X_test, y_train, y_test = train_test_split(X,y,test_size=0.2,random_state=42)
+
+<h3>3b. Train and test the model</h3>
+For this tutorial, we'll be using a *Decision Tree Classifier*, which is definitely one of the simplest classifiers out there: to start things out, this will be enough. Again, I won't explain how this works: just trust my code and, if you'll bare with my posts, I will come to talking about this kind of concepts too!
+
+    from sklearn.tree import DecisionTreeClassifier
+    
+    model = DecisionTreeClassifier() # build the model
+    model = model.fit(X_train, y_train) # train it
+
+
+Now we just have to test the model, and we will also have a look at its accuracy:
+
+    from sklearn.metrics import accuracy_score, classification_report
+    y_pred = model.predict(X_test)
+    print(f"Accuracy is {accuracy_score(y_test, y_pred)}")
+
+The output accuracy is perfect: **100%**!
+
+<div class="div-blue">
+<span class="alert-body">NOTE:</span>
+<span class="alert-header"> such a high accuracy usually is not seen with real-world data!</span>
+</div>
+
+Now we just have to save the model, so that we will be able to use it in our Telegram bot!
+
+    import joblib
+    
+    joblib.dump(model, "model.joblib")
+
+<h2>4. The bot</h2>
+<h3>4a. Setup</h3>
+Let's now build the bot! We already know how to generate a bot (we will call it ItalianTravelBot) and how to retrieve its API TOKEN from BotFather. We wil also need to load our machine-learning model and we will have to define some dictionaries to map the natural-language inputs we receive from the user's chat into numeric inputs for the ML algorithm, as well as other dictionaries to translate them back. We just do it into **bot.py** like this:
+
+    from telegram.ext import *
+    import pandas as pd
+    import joblib
+    
+    MODEL = joblib.load("model.joblib") # load the model
+    TOKEN = "YOUR_TOKEN_HERE" #not-real token
+    USR_DF = {"Month": 0,"Duration(days)": 0,"Age": 0,"Target": 0,"Accommodation": 0,"Acc_cost": 0,"Transportation": 0,"Transp_cost": 0} # model input sample dictionary
+    
+    NUM2MONTHS = {
+        1: "January",
+        2: "February",
+        3: "March",
+        4: "April",
+        5: "May",
+        6: "June",
+        7: "July",
+        8: "August",
+        9: "September",
+        10: "October",
+        11: "November",
+        12: "December"
+    } # number of month to natural-language month
+    # natural language to model input dictionaries :
+    TARGET2NUM = {"Alone": 0, "Couple": 1,  "Group": 2, "Family": 3}
+    ACC2NUM = {'Hostel': 0, 'Hotel': 1, 'Airbnb': 2, 'Resort': 3, 'Vacation rental': 4, 'Guesthouse': 5, 'Villa': 6}
+    TRANSP2NUM = {'Bus': 0, 'Car': 1, 'Train': 2, 'Plane': 3}
+
+
+<h3>The conversational architecture</h3>
+Now we can begin with the really difficult part: the conversational architecture. To explain it, we need to think of a real-world conversation: when you are talking to another human, usually you memorize the last thing they said, and respond to them accordingly. The same thing goes with a conversational Telegram bot: **it has to store the user's responses in order to use them in the next message**. 
+The only difference with a human is that a conversational bot has a **short-term memory** (only the last message), whereas our brain gives us the access to the whole conversation history with another person.
+A general conversational architecture, in a bot, is then set by a number of functions, identified by a unique `id`, whose output is the input to the downstream function.
+We will start by defining the ids for our conversational input-outputs:
+
+    AGE, MONTH, DURATION, TARGET, ACC, ACCOST, TRANSP, TRANSPCOST = range(len(USR_DF))
+
+And then we define our entry point, i.e. the `/start` command function:
+
+    async def start_command(update, context):
+        user = update.message.from_user
+        await update.message.reply_text(f"Hi {user.first_name} {user.last_name}, and thank you so much for having chosen ItalianTravelBot as your assistant today!\nAs you may already know, we offer several travel options, of which three are available right now: Rome, Florence, Courmayeur... I'm here to help you choose the most suitable for your needs and desires, so let's start with an ice-breaking question: How old are you? (Reply with a number)")
+        return AGE
+As you can see, it returns the first conversation input, which is AGE, that will be passed to the downstream function: the same will go with all the other functions, except for the last one, which will return `ConversationHandler.END`
+
+Here are all the functions in our code:
+
+    async def age(update, context):
+        global USR_DF
+        age = int(update.message.text)
+        USR_DF["Age"] = [age]
+        await update.message.reply_text(f"Wow, {age} years old: that's nice! And in which month are you planning to go on vacation? (Reply with the month number)")
+        return MONTH
+    
+    
+    async def month(update, context):
+        global USR_DF
+        mon = int(update.message.text)
+        USR_DF["Month"] = [mon]
+        await update.message.reply_text(f"{NUM2MONTHS[mon]}, awesome! And how are you going to travel? Reply with one of this categories: Alone, Couple, Group, Family")
+        return TARGET
+    
+    async def target(update, context):
+        global USR_DF
+        tar = update.message.text
+        USR_DF["Target"] = [TARGET2NUM[tar.capitalize()]]
+        await update.message.reply_text(f"{tar}, that's just perfect! And how are you planning to go there? We offer several options: Bus, Car, Plane, Train")
+        return TRANSP
+    
+    async def transp(update, context):
+        global USR_DF
+        tra = update.message.text
+        USR_DF["Transportation"] = [TRANSP2NUM[tra.capitalize()]]
+        await update.message.reply_text(f"You wanna go by {tra.capitalize()}, got it! And how much do you plan to spend on transportation? Reply with a number")
+        return TRANSPCOST
+    
+    async def transpcost(update, context):
+        global USR_DF
+        mon = int(update.message.text)
+        USR_DF["Transp_cost"] = [mon]
+        await update.message.reply_text(f"{mon}, that's a perfect match! Where are you planning to stay? We can offer: Hostel, Hotel, Airbnb, Resort, Vacation rental, Guesthouse, Villa. Reply exactly with one of these")
+        return ACC
+    
+    
+    async def acc(update, context):
+        global USR_DF
+        tar = update.message.text
+        USR_DF["Accommodation"] = [ACC2NUM[tar.capitalize()]]
+        await update.message.reply_text(f"{tar.capitalize()}, we got this one!  And how much do you plan to spend on accommodation? Reply with a number")
+        return ACCOST
+    
+    async def accost(update, context):
+        global USR_DF
+        mon = int(update.message.text)
+        USR_DF["Acc_cost"] = [mon]
+        await update.message.reply_text(f"{mon}, seems like everything is fitting perfectly! Last question: how long do you wanna stay? Reply with the number of days")
+        return DURATION
+    
+    async def duration(update, context):
+        global USR_DF, CSV
+        mon = int(update.message.text)
+        USR_DF["Duration(days)"] = [mon]
+        print(USR_DF)
+        await update.message.reply_text(f"Ok, got it! Just wait a few seconds and I'll tell you what is the best match for you!")
+        usrdf = pd.DataFrame.from_dict(USR_DF)
+        df = pd.read_csv(CSV)
+        merged = pd.concat([df, usrdf], axis=0, ignore_index=True)
+        merged.to_csv(CSV, index=False)
+        pred = MODEL.predict(usrdf)
+        await update.message.reply_text(f"The perfect destination for you is: {pred[0]}! Hope this was useful: in the next message you'll find the flyer with our offers for that city! :)")
+        flyer = f"{pred[0]}.pdf"
+        await update.message.reply_document(document=open(flyer, 'rb'))
+        return ConversationHandler.END
+
+<div class="div-blue">
+<span class="alert-body">NOTE: </span>
+<span class="alert-header">in the last function we used the `reply_document` method, which we did not see in the last tutorial!</span>
+</div>
+
+From all these function, we now need to build our conversation handler and add it to our bot, and we'll do it like this:
+
+    if __name__ == "__main__":
+        print("Bot is up and running")
+        application = Application.builder().token(TOKEN).build()
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('start', start_command)],
+            states={
+                AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age)],
+                MONTH: [MessageHandler(filters.TEXT & ~filters.COMMAND, month)],
+                TARGET: [MessageHandler(filters.TEXT & ~filters.COMMAND, target)],
+                TRANSP: [MessageHandler(filters.TEXT & ~filters.COMMAND, transp)],
+                TRANSPCOST: [MessageHandler(filters.TEXT & ~filters.COMMAND, transpcost)],
+                ACC: [MessageHandler(filters.TEXT & ~filters.COMMAND, acc)],
+                ACCOST: [MessageHandler(filters.TEXT & ~filters.COMMAND, accost)],
+                DURATION: [MessageHandler(filters.TEXT & ~filters.COMMAND, duration)]
+            },
+            fallbacks=[]
+        )
+        application.add_handler(conv_handler)
+        application.run_polling(1.0)
+
+As you can see, we define the entry point (i.e. the start of our conversation) as the `/start` command: after that, all the functions just take as input the outputs of the previous one.
+
+We can now save everything and make the bot run:
+
+    python3 bot.py
+
+Now we can chat with it! Just like this:
+
+![chat][1]
+
+<h2>Conclusion</h2>
+And we're done! We built a wonderful bot: it produces **language effortlessly**, it can **handle a real-life conversation** without seeming robotic, it is able to **support and advise** customers!
+We did everything with little prior knowledge and we were able to built something that **works** and that is **production-ready**: we could just offer this bot as a solution to a travel agency, if we wanted!
+In the next post, we will explore something even more powerful: an **AI and RAG-powered telegram bot** that helps you chat with your PDFs... Stay tuned!
+
+  [1]: https://coderlegion.com/?qa=blob&qa_blobid=9994260301925094737
