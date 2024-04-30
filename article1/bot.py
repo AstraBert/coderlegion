@@ -1,6 +1,6 @@
 from telegram.ext import *
 
-TOKEN = "6917358471:AAELOdwHi_PV_YJqRN-qGAq9BmUFYi6NYmc"
+TOKEN = ""
 
 async def start_command(update, context):
     await update.message.reply_text("Hi, I'm NeapolitanPizzaBot, how may I assist you today?")
