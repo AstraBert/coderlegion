@@ -120,7 +120,7 @@ async def unrecognized_command(update, context):
         or text.startswith("lan") == False
     ):
         await update.message.reply_text(
-            f'I cannot understand the message:\n"{text}"\nAs my programmer did not insert it among the command I am set to respond (that are /price, /menu and /location): please check for misspelling/errors or contact the programmer if you feel anything is wrong/missing'
+            f'I cannot understand the message:\n"{text}"\nAs my programmer did not insert it among the command I am set to respond (that are /start and /lan): please check for misspelling/errors or contact the programmer if you feel anything is wrong/missing'
         )
     else:
         pass
@@ -130,7 +130,7 @@ async def error_handler(update, context: CallbackContext) -> None:
     print(f"An error occurred: {context.error}")
     await update.message.reply_text("Sorry, something went wrong.")
 
-TOKEN = ""
+TOKEN = "6477050795:AAHnLIZbbBatB_bTvD9Sss9TVNeU6ajt4nA"
 
 if __name__ == "__main__":
     print("Bot is up and running")
