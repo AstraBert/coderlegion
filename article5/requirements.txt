@@ -1,0 +1,8 @@
+transformers==4.41.2
+sentence-transformers==3.0.0
+discord.py==2.3.2
+vecs==0.4.3
+langchain-core==0.2.2
+langchain-community==0.0.13
+langchain-cohere==0.1.5
+pydotenv==1.0.1
